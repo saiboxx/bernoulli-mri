@@ -14,7 +14,16 @@ from src.config import Configuration
 from src.constraint import ScoreConstrainer
 from src.dense_rate import DenseRateScheduler
 from src.distribution import SoftBernoulliSampler
-from src.utils import load_h5_slice, get_temperature, ifft2c, fft2c, plot_heatmap
+from src.utils import (
+    load_h5_slice,
+    get_temperature,
+    ifft2c,
+    fft2c,
+    plot_heatmap,
+    normalize,
+    reverse_normalize,
+    min_max_normalize,
+)
 
 
 class MaskOptimizer:
@@ -32,6 +41,9 @@ class MaskOptimizer:
         img = img.unsqueeze(0)
         img_k = img_k.unsqueeze(0)
 
+        img_low_q = torch.quantile(img, 0.01)
+        img_high_q = torch.quantile(img, 0.99)
+
         # Create mask handler that also contains scores
         mask_handler = get_mask_handler(
             name=self.cfg.mask_style,
@@ -48,8 +60,6 @@ class MaskOptimizer:
 
         log_recs = []
         log_masks = []
-        img_min = torch.min(img)
-        img_max = torch.max(img)
 
         for step in (pbar := tqdm(range(1, self.cfg.steps + 1))):
 
@@ -69,6 +79,7 @@ class MaskOptimizer:
             # Compute image with mask
             img_pred = ifft2c(img_k * mask + 0.0)
             img_mag = torch.abs(img_pred)
+            # img_mag = normalize(img_mag, img_mean, img_std)
 
             # Compute loss between full and undersampled image
             img_batch = img.expand(self.cfg.bern_samples, -1, -1, -1)
@@ -81,7 +92,7 @@ class MaskOptimizer:
 
             if step % 20 == 0:
                 pbar.set_description(
-                    'L: {:.5f} | D: {:.3f}'.format(
+                    'L: {:.2E} | D: {:.3f}'.format(
                         float(loss), float(torch.mean(mask_handler.get_scores()))
                     )
                 )
@@ -89,8 +100,7 @@ class MaskOptimizer:
             num_imgs = self.cfg.log_imgs
             if num_imgs > 0 and step % (self.cfg.steps // num_imgs) == 0:
                 img_rec = torch.abs(img_pred[0])
-                img_rec = (img_rec - img_min) / (img_max - img_min)
-                img_rec.clamp_(0, 1)
+                img_rec = min_max_normalize(img_rec, img_low_q, img_high_q)
 
                 log_recs.append(img_rec.detach().cpu())
                 log_masks.append(mask[0].detach().cpu())
@@ -99,7 +109,7 @@ class MaskOptimizer:
 
         # Construct training progress grid
         os.makedirs(self.cfg.log_dir, exist_ok=True)
-        img_org = (img - img_min) / (img_max - img_min)
+        img_org = min_max_normalize(img, img_low_q, img_high_q)
         log_recs.append(img_org.squeeze(0).cpu())
         log_masks.append(torch.zeros_like(img).squeeze(0).cpu())
 

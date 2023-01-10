@@ -41,6 +41,38 @@ def convert_complex_img_to_real(img: Tensor):
     return (img - img.min()) / (img.max() - img.min())
 
 
+def normalize(
+    x: Tensor, mean: Optional[Tensor] = None, std: Optional[Tensor] = None
+) -> Tensor:
+    if mean is None:
+        mean = torch.mean(x)
+    if std is None:
+        std = torch.std(x)
+    return (x - mean) / std
+
+
+def reverse_normalize(x: Tensor, mean: Tensor, std: Tensor) -> Tensor:
+    return x * std + mean
+
+
+def min_max_normalize(
+    x: Tensor,
+    min_val: Optional[Tensor] = None,
+    max_val: Optional[Tensor] = None,
+    min_quantile: float = 0.0,
+    max_quantile: float = 1.0,
+) -> Tensor:
+
+    if min_val is None:
+        min_val = torch.quantile(x, min_quantile)
+
+    if max_val is None:
+        max_val = torch.quantile(x, max_quantile)
+
+    x = torch.clamp(x, min_val, max_val)
+    return (x - min_val) / (max_val - min_val)
+
+
 def plot_image(img: Tensor, cmap: str = 'gray') -> None:
     if torch.is_complex(img):
         img = convert_complex_img_to_real(img)

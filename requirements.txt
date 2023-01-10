@@ -1,4 +1,5 @@
 h5py
 matplotlib
+nibabel
 torch
 torchvision
