@@ -1,10 +1,13 @@
 import glob
 import os
+import random
 from typing import Dict, Optional
 
+from monai.transforms import ScaleIntensity
 import nibabel as nib
 import torch
 from torch.utils.data import Dataset
+from torchvision.transforms import Resize, CenterCrop, Compose
 
 
 class ACDCDataset(Dataset):
@@ -15,19 +18,48 @@ class ACDCDataset(Dataset):
         data_dir = 'training' if train else 'testing'
         self.pat_dir = os.path.join(root, 'database', data_dir)
 
-        pattern = os.path.join(self.pat_dir, 'patient???', 'patient???_frame??.nii.gz')
-        self.frames = glob.glob(pattern)
-        self.frames_seg = [f.replace('.nii.gz', '_gt.nii.gz') for f in self.frames]
-        self.pat_ids = [d for d in os.listdir(self.pat_dir) if 'patient' in d]
+        pattern = os.path.join(self.pat_dir, 'patient???', 'patient???_frame01.nii.gz')
+        frames = glob.glob(pattern)
+
+        if max_patients is not None:
+            random.seed(42)
+            random.shuffle(frames)
+            frames = frames[:max_patients]
+
+        self.file_index = []
+        for frame in frames:
+            arr = nib.load(frame).get_fdata()
+            seg = nib.load(frame.replace('.nii.gz', '_gt.nii.gz')).get_fdata()
+
+            assert arr.shape == seg.shape
+            num_slices = arr.shape[-1]
+
+            for i in range(2, num_slices - 2):
+                self.file_index.append({
+                    'img': arr[:, :, i],
+                    'seg': seg[:, :, i],
+                })
+
+        self.img_transforms = Compose([
+            ScaleIntensity(),
+            Resize(256),
+            CenterCrop(256)
+        ])
+
+        self.seg_transforms = Compose([
+            Resize(256),
+            CenterCrop(256)
+        ])
 
     def __len__(self) -> int:
-        return len(self.frames)
+        return len(self.file_index)
 
     def __getitem__(self, idx: int) -> Dict:
-        frame_path = self.frames[idx]
-        seg_path = self.frames_seg[idx]
+        img = self.file_index[idx]['img']
+        img = torch.tensor(img).unsqueeze(0).float()
+        img = self.img_transforms(img)
 
-        frame = nib.load(frame_path)
-        seg = nib.load(seg_path)
-
-        return {'img': frame, 'seg': seg}
+        seg = self.file_index[idx]['seg']
+        seg = torch.tensor(seg).unsqueeze(0).float()
+        seg = self.seg_transforms(seg)
+        return {'img': img, 'seg': seg}
