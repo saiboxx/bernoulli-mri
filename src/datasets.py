@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize, CenterCrop, Compose
 
+from src.utils import fft2c
 
 class ACDCDataset(Dataset):
     def __init__(
@@ -62,4 +63,7 @@ class ACDCDataset(Dataset):
         seg = self.file_index[idx]['seg']
         seg = torch.tensor(seg).unsqueeze(0).float()
         seg = self.seg_transforms(seg)
-        return {'img': img, 'seg': seg}
+
+        k_space = fft2c(img)
+
+        return {'img': img, 'seg': seg, 'k_space': k_space}

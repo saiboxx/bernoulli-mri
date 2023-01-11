@@ -3,7 +3,7 @@ import os
 from typing import Tuple
 
 import matplotlib.pyplot as plt
-from torch.optim import Adam, SGD
+from torch.optim import Adam
 from tqdm import tqdm
 import torch
 from torch import Tensor, nn
@@ -20,8 +20,6 @@ from src.utils import (
     ifft2c,
     fft2c,
     plot_heatmap,
-    normalize,
-    reverse_normalize,
     min_max_normalize,
 )
 
@@ -79,7 +77,6 @@ class MaskOptimizer:
             # Compute image with mask
             img_pred = ifft2c(img_k * mask + 0.0)
             img_mag = torch.abs(img_pred)
-            # img_mag = normalize(img_mag, img_mean, img_std)
 
             # Compute loss between full and undersampled image
             img_batch = img.expand(self.cfg.bern_samples, -1, -1, -1)
