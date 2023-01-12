@@ -20,7 +20,7 @@ class ACDCDataset(Dataset):
         self.pat_dir = os.path.join(root, 'database', data_dir)
 
         pattern = os.path.join(self.pat_dir, 'patient???', 'patient???_frame01.nii.gz')
-        frames = glob.glob(pattern)
+        frames = sorted(glob.glob(pattern))
 
         if max_patients is not None:
             random.seed(42)
