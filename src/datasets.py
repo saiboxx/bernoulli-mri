@@ -1,3 +1,4 @@
+import csv
 import glob
 import os
 import random
@@ -5,11 +6,13 @@ from typing import Dict, Optional
 
 from monai.transforms import ScaleIntensity
 import nibabel as nib
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize, CenterCrop, Compose
 
-from src.utils import fft2c
+from src.utils import fft2c, ifft2c, load_h5_slice
+
 
 class ACDCDataset(Dataset):
     def __init__(
@@ -67,3 +70,70 @@ class ACDCDataset(Dataset):
         k_space = fft2c(img)
 
         return {'img': img, 'seg': seg, 'k_space': k_space}
+
+
+class KneeDataset(Dataset):
+    def __init__(self, root: str, train: bool = True) -> None:
+        self.root = root
+        data_dir = 'singlecoil_train' if train else 'singlecoil_val'
+        self.img_dir = os.path.join(root, data_dir)
+
+        annotations_file = 'annotations.csv'
+        self.annot_df = pd.read_csv(os.path.join(root, annotations_file))
+
+        # Filter for existing files
+        files = [f.replace('.h5', '') for f in os.listdir(self.img_dir)]
+        self.annot_df = self.annot_df[self.annot_df['file'].isin(files)]
+        self.annot_df = self.annot_df[self.annot_df['label'] != 'artifact']
+        self.annot_df['x'] = self.annot_df['x'].astype(int)
+        self.annot_df['y'] = self.annot_df['y'].astype(int)
+        self.annot_df['width'] = self.annot_df['width'].astype(int)
+        self.annot_df['height'] = self.annot_df['height'].astype(int)
+
+        self.file_index = []
+        for file, file_group in self.annot_df.groupby('file'):
+            for sl, slice_group in file_group.groupby('slice'):
+
+                annotations = []
+                for _, entry in slice_group.iterrows():
+                    a = (entry['x'], entry['y'], entry['width'], entry['height'])
+                    annotations.append(a)
+
+                self.file_index.append({
+                    'file': str(file) + '.h5',
+                    'slice': int(sl),
+                    'annotations': tuple(annotations)
+                })
+
+        self.transforms = CenterCrop(320)
+
+    def __len__(self) -> int:
+        return len(self.file_index)
+
+    def __getitem__(self, idx: int) -> Dict:
+        entry = self.file_index[idx]
+
+        k_space = load_h5_slice(
+            fp=os.path.join(self.img_dir, entry['file']),
+            slice_idx=entry['slice']
+        )
+        img = ifft2c(k_space)
+
+        # Synthesize "segmentation" from annotations bounding boxes
+        seg = torch.zeros_like(img, dtype=torch.float)
+        counter = 1.
+        for x, y, width, height in entry['annotations']:
+            seg[:, y:y+height, x:x+width] = counter
+            counter += 1.
+
+        img = self.transforms(img)
+        img = torch.abs(img)
+        seg = self.transforms(seg)
+        k_space = fft2c(img)
+
+        return {
+            'img': img,
+            'seg': seg,
+            'k_space': k_space,
+            'annotations': entry['annotations']
+        }
