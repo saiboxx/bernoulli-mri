@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 
 import h5py
@@ -106,3 +107,24 @@ def save_img(img: Tensor, fp: str, **kwargs) -> None:
     if torch.is_complex(img):
         img = convert_complex_img_to_real(img)
     save_image(tensor=img, fp=fp, **kwargs)
+
+
+class MaskLogger:
+    def __init__(self, log_dir: str) -> None:
+        self.probs = []
+        self.steps = []
+        self.dense_rates = []
+        self.log_dir = log_dir
+
+    def append(self, probs: Tensor, step: int, dense_rate: float) -> None:
+        self.probs.append(probs.detach().cpu())
+        self.steps.append(step)
+        self.dense_rates.append(dense_rate)
+
+    def write(self, f_name: str = 'results.pt') -> None:
+        content = {
+            'scores': self.probs,
+            'steps': self.steps,
+            'dense_rates': self.dense_rates
+        }
+        torch.save(obj=content, f=os.path.join(self.log_dir, f_name))
