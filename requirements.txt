@@ -4,3 +4,4 @@ monai
 nibabel
 torch
 torchvision
+scikit-image
