@@ -70,5 +70,5 @@ class SSIMMSELoss(nn.Module):
 
     def forward(self, prediction: Tensor, target: Tensor) -> Tensor:
         mse = self.mse(prediction, target)
-        ssim = self.sobel(prediction, target)
+        ssim = self.ssim(prediction, target)
         return self.alpha * mse + (1 - self.alpha) * ssim
