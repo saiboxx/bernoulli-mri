@@ -5,3 +5,4 @@ nibabel
 torch
 torchvision
 scikit-image
+kornia

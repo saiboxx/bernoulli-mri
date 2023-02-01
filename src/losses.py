@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 from torch.nn.functional import conv2d
-
+from kornia.losses import SSIMLoss
 
 class SobelLoss(nn.Module):
     def __init__(self) -> None:
@@ -58,3 +58,17 @@ class SobelMSELoss(nn.Module):
         mse = self.mse(prediction, target)
         sob = self.sobel(prediction, target)
         return self.alpha * mse + (1 - self.alpha) * sob
+
+
+class SSIMMSELoss(nn.Module):
+    def __init__(self, alpha: float = 0.5, ssim_window: int = 1) -> None:
+        super().__init__()
+        self.alpha = alpha
+
+        self.mse = nn.MSELoss()
+        self.ssim = SSIMLoss(ssim_window)
+
+    def forward(self, prediction: Tensor, target: Tensor) -> Tensor:
+        mse = self.mse(prediction, target)
+        ssim = self.sobel(prediction, target)
+        return self.alpha * mse + (1 - self.alpha) * ssim
