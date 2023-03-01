@@ -1,3 +1,4 @@
+# +
 import torch
 import torch.cuda
 from monai.networks.nets import UNet
@@ -11,7 +12,7 @@ def main():
 
     model = UNet(
         spatial_dims=2,
-        in_channels=1,
+        in_channels=4,
         out_channels=4,
         channels=(16, 32, 64, 128, 256),
         strides=(2, 2, 2, 2),
@@ -30,14 +31,14 @@ def main():
         model=model,
         optimizer=optimizer,
         loss_func=loss_func,
-        dataset='acdc',
+        dataset='brain',
         save_dir='models',
-        save_name='acdc_base.pt',
-        batch_size=64,
+        save_name='brain_base.pt',
+        batch_size=256,
         epochs=1000,
-        num_workers=4,
+        num_workers=8,
         device=device,
-        dataset_root='data',
+        dataset_root='/data/core-rad/data',
         seed=42,
     )
 

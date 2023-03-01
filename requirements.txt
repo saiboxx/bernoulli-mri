@@ -2,7 +2,9 @@ h5py
 matplotlib
 monai
 nibabel
+piqa
 torch
 torchvision
+tqdm
 scikit-image
 kornia

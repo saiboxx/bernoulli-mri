@@ -3,10 +3,13 @@ from typing import Optional
 
 import h5py
 import matplotlib.pyplot as plt
+from monai.networks import one_hot
+import numpy as np
 import torch
 from torch import Tensor
 from torch.fft import ifftshift, fftshift, ifft2, fft2
 from torchvision.utils import save_image
+
 
 
 def ifft2c(data: Tensor, norm: str = 'forward') -> Tensor:
@@ -128,3 +131,29 @@ class MaskLogger:
             'dense_rates': self.dense_rates
         }
         torch.save(obj=content, f=os.path.join(self.log_dir, f_name))
+
+
+def convert_brats_labels(seg):
+    pred = one_hot(seg, num_classes=4)
+
+    res = torch.zeros_like(pred)
+
+    res[:, 0] = pred[:, 0]
+    res[:, 1] = torch.where(torch.sum(pred[:, 1:], dim=1) > 0, 1, 0)
+    res[:, 2] = torch.where(torch.sum(pred[:, 2:], dim=1) > 0, 1, 0)
+    res[:, 3] = pred[:, 3]
+    return res
+
+
+def get_top_k_mask(scores: Tensor, acc_fac: int) -> Tensor:
+    assert len(scores.shape) == 2, 'Expected tensor to be (H x W)'
+
+    num_elem = scores.numel()
+    k = int(num_elem / acc_fac)
+
+    v, i = torch.topk(scores.flatten(), k)
+    idxs = torch.tensor(np.asarray(np.unravel_index(i.cpu().numpy(), scores.shape)).T)
+
+    mask = torch.zeros_like(scores)
+    mask[idxs[:, 0], idxs[:, 1]] = 1
+    return mask

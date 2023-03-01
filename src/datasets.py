@@ -157,12 +157,12 @@ class KneeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict:
         f_path = os.path.join(self.file_dir, self.files[idx])
-        arr = np.load(f_path)
-
-        img = torch.tensor(arr['img'])
-        seg = torch.tensor(arr['seg'])
-        k_space = torch.tensor(arr['k_space'])
-        annot = torch.tensor(arr['annot'])
+        
+        with np.load(f_path) as arr:
+            img = torch.tensor(arr['img'])
+            seg = torch.tensor(arr['seg'])
+            k_space = torch.tensor(arr['k_space'])
+        #annot = torch.tensor(arr['annot'])
 
         return {
             'img': img,
@@ -220,7 +220,7 @@ class BrainDataset(Dataset):
             seg = nibabel.load(seg_path).get_fdata()
 
             for idx in range(slice_range[0], slice_range[1]):
-                img_slice = img[:, :, idx, 2]
+                img_slice = np.transpose(img[:, :, idx, :], axes=(2, 0, 1))
                 seg_slice = seg[:, :, idx]
 
                 f_name = entry['image'][17:20] + '_sl_' + str(idx).zfill(3) + '.npz'
@@ -238,10 +238,10 @@ class BrainDataset(Dataset):
         seg = torch.tensor(arr['seg'])
 
         img = min_max_normalize(img, min_quantile=0.001, max_quantile=0.999)
-        img = img.unsqueeze(0).float()
+        img = img.float()
         img = self.transforms(img)
 
-        seg = seg.unsqueeze(0).float()
+        seg = seg.float().unsqueeze(0)
         seg = self.transforms(seg)
 
         k_space = fft2c(img)

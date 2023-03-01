@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import matplotlib.pyplot as plt
 from torch.optim import Adam
@@ -28,14 +28,15 @@ def cycle(iterable):
             yield x
 
 
-def run_dataset_optim(cfg: Dict) -> None:
+def run_dataset_optim(cfg: Dict, loss_func: Optional[nn.Module] = None) -> None:
 
     # Initialize objects
     # ----------------------------------------------------------------------------------
-    torch.manual_seed(cfg['seed'])
+    if cfg['seed'] is not None:
+        torch.manual_seed(cfg['seed'])
 
-    if cfg['use_seg']:
-        loss_func = nn.MSELoss(reduction='none')
+    if loss_func is not None:
+        loss_func = loss_func
     else:
         loss_func = nn.MSELoss()
 
@@ -48,7 +49,14 @@ def run_dataset_optim(cfg: Dict) -> None:
     else:
         raise ValueError('Dataset {} unknown.'.format(cfg['dataset']))
 
-    data_loader = DataLoader(ds, batch_size=cfg['batch_size'], shuffle=True, num_workers=16)
+    data_loader = DataLoader(
+        ds,
+        batch_size=cfg['batch_size'],
+        shuffle=True,
+        num_workers=cfg['num_workers'],
+        pin_memory=True,
+        persistent_workers=True
+    )
     data_iter = iter(cycle(data_loader))
 
     dense_scheduler = DenseRateScheduler(
@@ -107,17 +115,12 @@ def run_dataset_optim(cfg: Dict) -> None:
         img_mag = torch.abs(img_pred)
 
         # Compute loss between full and undersampled image
-        loss = loss_func(img_mag, img_batch)
-
         if cfg['use_seg']:
-            seg = samples['seg']
-            seg[seg != 0] = cfg['seg_weight']
-            seg[seg == 0] = 1
-            seg = torch.repeat_interleave(
-                seg, repeats=cfg['bern_samples'], dim=0).to(cfg['device']
-                                                            )
-            loss *= seg
-            loss = torch.mean(loss)
+            seg = samples['seg'].to(cfg['device'])
+            seg = torch.repeat_interleave(seg, repeats=cfg['bern_samples'], dim=0)
+            loss = loss_func(img_mag, seg)
+        else:
+            loss = loss_func(img_mag, img_batch)
 
         # Optimize scores
         optimizer.zero_grad()
@@ -136,27 +139,39 @@ def run_dataset_optim(cfg: Dict) -> None:
                           step=step, dense_rate=dense_scheduler.get_dense_rate())
 
         if cfg['log_imgs'] > 0 and step % (cfg['steps'] // cfg['log_imgs']) == 0:
-            img_rec = torch.abs(img_pred[0])
+            if cfg['dataset'] == 'brain':
+                img_rec = torch.abs(img_pred[0, torch.randint(0, 3, (1,))[0]])
+                log_masks.append(mask[0, 0].detach().cpu())
+            else:
+                img_rec = torch.abs(img_pred[0])
+                log_masks.append(mask[0].detach().cpu())
 
             img_low_q = torch.quantile(img, 0.01)
             img_high_q = torch.quantile(img, 0.99)
-
             img_rec = min_max_normalize(img_rec, img_low_q, img_high_q)
-
             log_recs.append(img_rec.detach().cpu())
-            log_masks.append(mask[0].detach().cpu())
 
     # ------------------------------------------------------------------------------
     os.makedirs(cfg['log_dir'], exist_ok=True)
     logger.write()
 
     # Construct training progress grid
-    img_org = min_max_normalize(img[0], img_low_q, img_high_q)
-    log_recs.append(img_org.cpu())
-    log_masks.append(torch.zeros_like(img[0]).cpu())
+    if cfg['dataset'] == 'brain':
+        img_org = min_max_normalize(img[0, 2], img_low_q, img_high_q)
+        log_recs.append(img_org.cpu())
+        log_masks.append(torch.zeros_like(img[0, 2]).cpu())
+
+        img_list = log_recs + log_masks
+        for i in range(len(img_list)):
+            img_list[i] = img_list[i].unsqueeze(0)
+    else:
+        img_org = min_max_normalize(img[0], img_low_q, img_high_q)
+        log_recs.append(img_org.cpu())
+        log_masks.append(torch.zeros_like(img[0]).cpu())
+        img_list = log_recs + log_masks
 
     save_image(
-        log_recs + log_masks,
+        img_list,
         fp=cfg['log_dir'] + '/progress.png',
         nrow=len(log_recs),
     )
