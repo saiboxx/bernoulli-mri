@@ -1,4 +1,5 @@
 h5py
+jupyter
 matplotlib
 monai
 nibabel
