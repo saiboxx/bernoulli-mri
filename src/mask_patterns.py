@@ -196,41 +196,6 @@ class MaskFunc:
             choice = self.rng.randint(len(self.center_fractions))
             return self.center_fractions[choice], self.accelerations[choice]
 
-
-class RandomMaskFunc(MaskFunc):
-    """
-    Creates a random sub-sampling mask of a given shape.
-    The mask selects a subset of columns from the input k-space data. If the
-    k-space data has N columns, the mask picks out:
-        1. N_low_freqs = (N * center_fraction) columns in the center
-           corresponding to low-frequencies.
-        2. The other columns are selected uniformly at random with a
-        probability equal to: prob = (N / acceleration - N_low_freqs) /
-        (N - N_low_freqs). This ensures that the expected number of columns
-        selected is equal to (N / acceleration).
-    It is possible to use multiple center_fractions and accelerations, in which
-    case one possible (center_fraction, acceleration) is chosen uniformly at
-    random each time the ``RandomMaskFunc`` object is called.
-    For example, if accelerations = [4, 8] and center_fractions = [0.08, 0.04],
-    then there is a 50% probability that 4-fold acceleration with 8% center
-    fraction is selected and a 50% probability that 8-fold acceleration with 4%
-    center fraction is selected.
-    """
-
-    def calculate_acceleration_mask(
-        self,
-        num_cols: int,
-        acceleration: int,
-        offset: Optional[int],
-        num_low_frequencies: int,
-    ) -> np.ndarray:
-        prob = (num_cols / acceleration - num_low_frequencies) / (
-            num_cols - num_low_frequencies
-        )
-
-        return self.rng.uniform(size=num_cols) < prob
-
-
 class EquiSpacedMaskFunc(MaskFunc):
     """
     Sample data with equally-spaced k-space lines.
@@ -333,9 +298,7 @@ def create_mask_for_mask_type(
     Returns:
         A mask func for the target mask type.
     """
-    if mask_type_str == "random":
-        return RandomMaskFunc(center_fractions, accelerations)
-    elif mask_type_str == "equispaced":
+    if mask_type_str == "equispaced":
         return EquiSpacedMaskFunc(center_fractions, accelerations)
     elif mask_type_str == "equispaced_fraction":
         return EquispacedMaskFractionFunc(center_fractions, accelerations)

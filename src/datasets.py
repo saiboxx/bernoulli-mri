@@ -36,8 +36,12 @@ class ACDCDataset(Dataset):
 
         self.file_index = []
         for frame in frames:
-            arr = nib.load(frame).get_fdata()
-            seg = nib.load(frame.replace('.nii.gz', '_gt.nii.gz')).get_fdata()
+            arr_nifti = nib.load(frame)
+            arr = np.copy(arr_nifti.get_fdata())
+            del arr_nifti
+            seg_nifti = nib.load(frame.replace('.nii.gz', '_gt.nii.gz'))
+            seg = np.copy(seg_nifti.get_fdata())
+            del seg_nifti
 
             assert arr.shape == seg.shape
             num_slices = arr.shape[-1]

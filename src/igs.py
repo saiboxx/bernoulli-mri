@@ -15,7 +15,8 @@ class IGS:
             loss_func: Optional[nn.Module] = None,
             device: str = 'cuda',
             num_workers: int = 8,
-            batch_size: int = 32
+            batch_size: int = 32,
+            use_seg: bool = False,
     ) -> None:
         if loss_func is None:
             self.loss_func = nn.L1Loss()
@@ -25,6 +26,7 @@ class IGS:
         self.device = torch.device(device)
         self.num_workers = num_workers
         self.batch_size = batch_size
+        self.use_seg = use_seg
 
     @staticmethod
     def get_n(acc_fac: int, img_size: int) -> int:
@@ -55,13 +57,18 @@ class IGS:
             w.grad = None
             w.requires_grad = True
             for batch in dl:
-                img = batch['img'].to(self.device)
                 img_k = batch['k_space'].to(self.device)
 
                 img_pred = ifft2c(img_k * w + 0.0)
                 img_mag = torch.abs(img_pred)
 
-                loss = self.loss_func(img_mag, img)
+                if self.use_seg:
+                    seg = batch['seg'].to(self.device)
+                    loss = self.loss_func(img_mag, seg)
+                else:
+                    img = batch['img'].to(self.device)
+                    loss = self.loss_func(img_mag, img)
+
                 loss.backward()
 
             for i in torch.topk(w.grad, img_size, largest=False).indices:

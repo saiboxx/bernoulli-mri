@@ -7,7 +7,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torchvision.utils import save_image
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from src.constraint import ScoreConstrainer
 from src.dense_rate import DenseRateScheduler
@@ -28,7 +28,11 @@ def cycle(iterable):
             yield x
 
 
-def run_dataset_optim(cfg: Dict, loss_func: Optional[nn.Module] = None) -> None:
+def run_dataset_optim(
+        cfg: Dict,
+        ds: Optional[Dataset]= None,
+        loss_func: Optional[nn.Module] = None
+) -> None:
 
     # Initialize objects
     # ----------------------------------------------------------------------------------
@@ -40,14 +44,15 @@ def run_dataset_optim(cfg: Dict, loss_func: Optional[nn.Module] = None) -> None:
     else:
         loss_func = nn.MSELoss()
 
-    if cfg['dataset'] == 'acdc':
-        ds = ACDCDataset(os.path.join(cfg['dataset_root'], 'ACDC'), train=True)
-    elif cfg['dataset'] == 'brain':
-        ds = BrainDataset(os.path.join(cfg['dataset_root'], 'Task01_BrainTumour'), train=True)
-    elif cfg['dataset'] == 'knee':
-        ds = KneeDataset(os.path.join(cfg['dataset_root'], 'knee_fastmri'), train=True)
-    else:
-        raise ValueError('Dataset {} unknown.'.format(cfg['dataset']))
+    if ds is None:
+        if cfg['dataset'] == 'acdc':
+            ds = ACDCDataset(os.path.join(cfg['dataset_root'], 'ACDC'), train=True)
+        elif cfg['dataset'] == 'brain':
+            ds = BrainDataset(os.path.join(cfg['dataset_root'], 'Task01_BrainTumour'), train=True)
+        elif cfg['dataset'] == 'knee':
+            ds = KneeDataset(os.path.join(cfg['dataset_root'], 'knee_fastmri'), train=True)
+        else:
+            raise ValueError('Dataset {} unknown.'.format(cfg['dataset']))
 
     data_loader = DataLoader(
         ds,
