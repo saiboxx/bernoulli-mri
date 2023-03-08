@@ -12,6 +12,9 @@ from src.losses import SegmentationProxyLoss
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+NUM_RUNS = 10
+NUM_MEMBERS = 10
+
 BASE_CONFIG = {
     'dataset': 'brain',
     'dataset_root': '/data/core-rad/data',
@@ -20,7 +23,7 @@ BASE_CONFIG = {
     'use_seg': True,
     'learning_rate': 1e-2,
     'bern_samples': 4,
-    'mask_style': 'h',
+    'mask_style': 'f',
     'num_workers': 16,
     'dense_target': 1 / 8,
     'dense_start': 0.10,
@@ -33,8 +36,6 @@ BASE_CONFIG = {
 }
 
 def main(cfg: Dict, mask_style: str, acc_fac: Optional[int] = None) -> None:
-    num_runs = 10
-    num_members = 10
     cfg['mask_style'] = mask_style
 
     print('MASK STYLE: {}'.format(cfg['mask_style']))
@@ -52,7 +53,7 @@ def main(cfg: Dict, mask_style: str, acc_fac: Optional[int] = None) -> None:
         num_res_units=2
     ).cuda()
 
-    sd = torch.load('models/brain_base.pt')
+    sd = torch.load('models/brain_unet.pt')
     model.load_state_dict(sd['model'])
 
     loss_func = DiceCELoss(
@@ -68,13 +69,13 @@ def main(cfg: Dict, mask_style: str, acc_fac: Optional[int] = None) -> None:
     else:
         acc_facs = [acc_fac]
 
-    for run_idx in range(1, 1 + num_runs):
+    for run_idx in range(1, 1 + NUM_RUNS):
         for acc_fac in acc_facs:
-            for i in range(1, 1 + num_members):
+            for i in range(1, 1 + NUM_MEMBERS):
                 print('RUN {} | ACC FAC {} | MEMBER {}'.format(run_idx, acc_fac, i))
                 cfg['dense_target'] = 1 / acc_fac
                 cfg['log_dir'] = os.path.join(
-                    'logs_final',
+                    'logs',
                     'brats_' + prefix + '_a' + str(acc_fac),
                     'brats_r' + str(run_idx) + '_m' + str(i)
                 )
@@ -82,18 +83,18 @@ def main(cfg: Dict, mask_style: str, acc_fac: Optional[int] = None) -> None:
                 if os.path.exists(cfg['log_dir']):
                     continue
 
-                run_dataset_optim(cfg, loss_func)
+                run_dataset_optim(cfg, loss_func=loss_func)
 
-    for run_idx in range(1, 1 + num_runs):
+    for run_idx in range(1, 1 + NUM_RUNS):
         for acc_fac in acc_facs:
-            path_stem = f'logs_final/brats_' + prefix + f'_a{acc_fac}/brats_r{run_idx}_m'
+            path_stem = f'logs/brats_' + prefix + f'_a{acc_fac}/brats_r{run_idx}_m'
 
-            paths = [path_stem + str(i) + '/results.pt' for i in range(1, num_members + 1)]
+            paths = [path_stem + str(i) + '/results.pt' for i in range(1, NUM_MEMBERS + 1)]
             scores = [torch.load(f)['scores'][-1].cuda() for f in paths]
 
             scores_sum = torch.sum(torch.cat(scores), dim=(0, 1))
 
-            new_path = f'logs_final/brats_' + prefix + f'_a{acc_fac}/brats_r{run_idx}.pt'
+            new_path = f'logs/brats_' + prefix + f'_a{acc_fac}/brats_r{run_idx}.pt'
             torch.save({
                 'scores': [scores_sum.cpu()]
             }, new_path)

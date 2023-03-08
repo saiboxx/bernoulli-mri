@@ -33,7 +33,7 @@ def main():
         loss_func=loss_func,
         dataset='brain',
         save_dir='models',
-        save_name='brain_base.pt',
+        save_name='brain_unet.pt',
         batch_size=256,
         epochs=1000,
         num_workers=8,
