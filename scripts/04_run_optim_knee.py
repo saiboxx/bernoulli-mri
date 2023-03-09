@@ -11,7 +11,7 @@ NUM_MEMBERS = 10
 
 BASE_CONFIG = {
     'dataset': 'knee',
-    'dataset_root': '/data/core-rad/data',
+    'dataset_root': '/data',
     'batch_size': 32,
     'steps': 2500,
     'use_seg': False,
@@ -65,6 +65,7 @@ def main(cfg: Dict, mask_style: str = 'f', acc_fac: Optional[int] = None) -> Non
 
             paths = [path_stem + str(i) + '/results.pt' for i in range(1, NUM_MEMBERS + 1)]
             scores = [torch.load(f)['scores'][-1].cuda() for f in paths]
+            scores /= NUM_MEMBERS
 
             scores_sum = torch.sum(torch.cat(scores), dim=(0, 1))
 

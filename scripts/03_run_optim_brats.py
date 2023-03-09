@@ -17,7 +17,7 @@ NUM_MEMBERS = 10
 
 BASE_CONFIG = {
     'dataset': 'brain',
-    'dataset_root': '/data/core-rad/data',
+    'dataset_root': '/data',
     'batch_size': 32,
     'steps': 2500,
     'use_seg': True,
@@ -93,6 +93,7 @@ def main(cfg: Dict, mask_style: str, acc_fac: Optional[int] = None) -> None:
             scores = [torch.load(f)['scores'][-1].cuda() for f in paths]
 
             scores_sum = torch.sum(torch.cat(scores), dim=(0, 1))
+            scores /= NUM_MEMBERS
 
             new_path = f'logs/brats_' + prefix + f'_a{acc_fac}/brats_r{run_idx}.pt'
             torch.save({

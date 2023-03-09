@@ -38,7 +38,7 @@ def main():
         epochs=1000,
         num_workers=8,
         device=device,
-        dataset_root='/data/core-rad/data',
+        dataset_root='/data',
         seed=42,
     )
 
