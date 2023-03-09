@@ -9,7 +9,7 @@ from src.igs import IGS
 from src.datasets import ACDCDataset, BrainDataset, KneeDataset
 
 NUM_WORKERS = 16
-DATASET_ROOT = '/data'
+DATASET_ROOT = 'data'
 LOG_DIR = 'logs/IGS'
 
 def get_unet(dataset_name: str) -> UNet:

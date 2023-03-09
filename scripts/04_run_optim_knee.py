@@ -11,7 +11,7 @@ NUM_MEMBERS = 10
 
 BASE_CONFIG = {
     'dataset': 'knee',
-    'dataset_root': '/data',
+    'dataset_root': 'data',
     'batch_size': 32,
     'steps': 2500,
     'use_seg': False,
