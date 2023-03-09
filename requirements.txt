@@ -1,11 +1,11 @@
 h5py
 jupyter
 matplotlib
-monai
+monai==1.1.0
 nibabel
 piqa
-torch
-torchvision
+torch==1.13.1
+torchvision==0.14.1
 tqdm
-scikit-image
-kornia
+scikit-image==0.19.3
+kornia==0.6.9

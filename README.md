@@ -33,6 +33,8 @@ e.g. over `pip`:
 pip install -r requirements.txt
 ```
 
+We use Python 3.9.
+
 ## Datasets
 
 Our repository uses [ACDC](https://www.creatis.insa-lyon.fr/Challenge/acdc/databases.html),
