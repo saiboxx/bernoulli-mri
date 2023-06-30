@@ -1,7 +1,6 @@
 # Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction
 
-Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](tbd)
-at the *MICCAI 2023*.
+Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](https://arxiv.org/abs/2305.16376).
 
 > Undersampling is a common method in Magnetic Resonance Imaging (MRI) to subsample the 
 > number of data points in k-space and thereby reduce acquisition times at the cost 
