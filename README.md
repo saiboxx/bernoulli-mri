@@ -1,22 +1,16 @@
 # Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction
 
-Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](https://arxiv.org/abs/2305.16376).
+Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](tbd).
 
-> Undersampling is a common method in Magnetic Resonance Imaging (MRI) to subsample the 
-> number of data points in k-space and thereby reduce acquisition times at the cost 
-> of decreased image quality. In this work, we directly learn the undersampling masks 
-> to derive task- and anatomic-specific patterns. To solve this discrete optimization
-> challenge, we propose a general optimization routine called **ProM**: 
-> A fully probabilistic, differentiable, versatile, and model-free framework for 
-> mask optimization that enforces acceleration factors through a convex constraint.
-> Our framework opens up various directions of interesting research in data-driven 
-> undersampling mask learning. Analyzing knee, brain, and cardiac MRI datasets with
-> our method, we discover that different modalities reveal different optimal
-> undersampling masks. Furthermore, **ProM** can create undersampling masks that 
-> maximize performance in downstream tasks like segmentation with networks trained 
-> on fully sampled MRIs. Even with extreme acceleration factors, **ProM** yields 
-> reasonable performance while being more versatile than existing methods, 
-> paving the way for data-driven all-purpose mask generation.
+> Undersampling is a common method in Magnetic Resonance Imaging (MRI) to subsample the number of data points in k-space, reducing acquisition times at the cost of decreased image quality.
+> A popular approach is to employ undersampling patterns following various strategies, e.g., variable density sampling or radial trajectories.
+> In this work, we propose a method that directly learns the undersampling masks from data points, thereby also providing task- and domain-specific patterns.
+> To solve the resulting discrete optimization problem, we propose a general optimization routine called ProM: A fully probabilistic, differentiable, versatile, and model-free framework for mask optimization that enforces acceleration factors
+> through a convex constraint.
+> Analyzing knee, brain, and cardiac MRI datasets with our method, we discover that different anatomic regions reveal distinct optimal undersampling masks,
+> demonstrating the benefits of using custom masks, tailored for a downstream task.
+> Furthermore, ProM can create undersampling masks that maximize performance in downstream tasks like segmentation with networks trained on fully-sampled MRIs.
+> Even with extreme acceleration factors, ProM yields reasonable performance while being more versatile than existing methods, paving the way for data-driven all-purpose mask generation.
 
 
 <p align="center">
