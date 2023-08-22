@@ -1,17 +1,15 @@
 # Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction
 
-Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](tbd).
+Code for the paper [Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction](https://arxiv.org/abs/2305.16376) @ WACV 2024.
 
 > Undersampling is a common method in Magnetic Resonance Imaging (MRI) to subsample the number of data points in k-space, reducing acquisition times at the cost of decreased image quality.
 > A popular approach is to employ undersampling patterns following various strategies, e.g., variable density sampling or radial trajectories.
 > In this work, we propose a method that directly learns the undersampling masks from data points, thereby also providing task- and domain-specific patterns.
-> To solve the resulting discrete optimization problem, we propose a general optimization routine called ProM: A fully probabilistic, differentiable, versatile, and model-free framework for mask optimization that enforces acceleration factors
-> through a convex constraint.
+> To solve the resulting discrete optimization problem, we propose a general optimization routine called ProM: A fully probabilistic, differentiable, versatile, and model-free framework for mask optimization that enforces acceleration factors through a convex constraint.
 > Analyzing knee, brain, and cardiac MRI datasets with our method, we discover that different anatomic regions reveal distinct optimal undersampling masks,
 > demonstrating the benefits of using custom masks, tailored for a downstream task.
 > Furthermore, ProM can create undersampling masks that maximize performance in downstream tasks like segmentation with networks trained on fully-sampled MRIs.
 > Even with extreme acceleration factors, ProM yields reasonable performance while being more versatile than existing methods, paving the way for data-driven all-purpose mask generation.
-
 
 <p align="center">
 <img src=assets/prom_progress.png />
@@ -40,123 +38,41 @@ The pre-processing of the datasets will be triggered on the first call
 of the respective dataset objects: `ACDCDataset`, `BrainDataset`, `KneeDataset` in
 `src/datasets.py`.
 
+## Use Own Data
 
-## Experiments
+In general, a target dataset needs to fulfill the requirement of implementing a subclass of `ProMDataset` in `src/datasets.py`.
+This implies that the `__get_item__` method should return a dictionary containing tensors of the image in 
+image space, k-space and a segmentation. Hereby, the segmentation maybe an empty dummy if the segmentation
+downstream task is not applied.
+Also an image size should be supplied.
 
-The sections below contain the experiments, which were conducted in the paper.
-A single run for a dataset only takes minutes but be aware that in this reproducibility
-setting, 10 runs with random initializations for each method are triggered.
+The `run_dataset_optim`, which kicks off the training procedure, allows passing a custom dataset
+directly like:
 
-Generally, optimization runs are in `scripts`. Each file contains a dictionary,
-for configuring the optimization procedure. Evaluation is done in `notebooks`.
-
-## Iterative Gradient Sampling (IGS)
-
-The results for the IGS method can by created by calling `scripts/05_run_igs.py`
-like:
-
-```shell
-for i in {1..10}; do python scripts/05_run_igs.py --idx $i; done
+```python
+run_dataset_optim(cfg=cfg, ds=MyCustomDataset())
 ```
 
-## Reconstruction Experiments with fastMRI Knee
+## Train ProM
 
-The reconstruction experiments are executed by calling `scripts/04_run_optim_knee.py`:
+The subfolder `scripts` contains a few starter scripts on how to use apply ProM to a PyTorch dataset.
+The first script `01_run_prom_reconstruction.py` shows how to configure and train ProM for
+a classic reconstruct task. `02_train_unet.py` trains the U-nets used for the segmentation downstream tasks
+in our paper. These are also available in the `models` directory.
+Subsequently, `03_run_prom_segmentation.py` applies the trained networks in the ProM procedure.
+Lastly, use `04_eval_mask.py` to obtain metrics.
 
-```shell
-python scripts/04_run_optim_knee.py
+
+
+## Citation
+
+If you use our repository in your research, please cite our paper *Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction*:
+
 ```
-Afterwards, the notebook `notebooks/01_reconstruction_knee.ipynb` needs to be executed
-to obtain the metrics. Our experiments resulted in following metrics:
-
-### Acceleration Factor x4
-|            | **PSNR** | **SSIM** | **NMSE** | 
-|------------|----------|----------|----------|
-| **Equi.**  | 24.481   | 0.601    | 0.066    | 
-| **Gauss.** | 29.570   | 0.664    | 0.027    | 
-| **IGS**    | 28.553   | 0.640    | 0.031    | 
-| **ProM**   | 29.787   | 0.672    | 0.026    |
-
-### Acceleration Factor x8
-|            | **PSNR** | **SSIM** | **NMSE** | 
-|------------|----------|----------|----------|
-| **Equi.**  | 23.803   | 0.524    | 0.077    | 
-| **Gauss.** | 28.118   | 0.560    | 0.035    | 
-| **IGS**    | 26.428   | 0.532    | 0.047    | 
-| **ProM**   | 28.472   | 0.570    | 0.034    |
-
-### Acceleration Factor x16
-|            | **PSNR** | **SSIM** | **NMSE** | 
-|------------|----------|----------|----------|
-| **Equi.**  | 23.365   | 0.474    | 0.085    | 
-| **Gauss.** | 23.342   | 0.440    | 0.112    | 
-| **IGS**    | 24.376   | 0.458    | 0.070    | 
-| **ProM**   | 27.575   | 0.511    | 0.040    |
-
-### Acceleration Factor x32
-|            | **PSNR** | **SSIM** | **NMSE** | 
-|------------|----------|----------|----------|
-| **Equi.**  | 23.158   | 0.448    | 0.090    | 
-| **Gauss.** | 17.373   | 0.299    | 0.396    | 
-| **IGS**    | 22.313   | 0.409    | 0.108    | 
-| **ProM**   | 26.739   | 0.473    | 0.046    |
-
-
-## Segmentation Experiments with ACDC
-
-The pre-trained segmentation model is contained in `models/acdc_unet.pt`.
-It can be retrained by adapting `01_train_unet.py` with the `acdc` dataset flag.
-
-To start computation for ProM with a 2D mask, call:
-
-```shell
-python scripts/04_run_optim_acdc.py -m f
+@inproceedings{weber2024constrained,
+  title={Constrained Probabilistic Mask Learning for Task-specific Undersampled MRI Reconstruction},
+  author={Weber, Tobias and Ingrisch, Michael and Bischl, Bernd and R{\"u}gamer, David},
+    booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+    year      = {2024},
+}
 ```
-
-For the 1D ProM call:
-
-```shell
-python scripts/04_run_optim_acdc.py -m h
-```
-
-After compute has finished, the below metrics are obtained by running 
-`notebooks/02_segmentation_acdc.ipynb`
-
-| **Acc. Fac.** | **Metric** | **Equi.** | **Gauss.** | **IGS** | **ProM (1D)** | **ProM (2D)** |
-|---------------|------------|-----------|------------|---------|---------------|---------------|
-| x8            | Dice       | 0.671     | 0.847      | 0.828   | 0.762         | 0.839         |
-| x8            | IoU        | 0.546     | 0.752      | 0.726   | 0.650         | 0.742         |
-| x16           | Dice       | 0.645     | 0.745      | 0.745   | 0.717         | 0.789         |
-| x16           | IoU        | 0.517     | 0.534      | 0.627   | 0.599         | 0.679         |
-| x32           | Dice       | 0.644     | 0.399      | 0.592   | 0.587         | 0.727         |
-| x32           | IoU        | 0.517     | 0.301      | 0.466   | 0.460         | 0.606         |
-
-
-## Segmentation Experiments with BraTS
-
-The pre-trained segmentation model is contained in `models/brain_unet.pt`.
-It can be retrained by adapting `01_train_unet.py` with the `brain` dataset flag.
-
-To start computation for ProM with a 2D mask, call:
-
-```shell
-python scripts/04_run_optim_brats.py -m f
-```
-
-For the 1D ProM call:
-
-```shell
-python scripts/04_run_optim_brats.py -m h
-```
-
-After compute has finished, the below metrics are obtained by running 
-`notebooks/03_segmentation_brats.ipynb`
-
-| **Acc. Fac.** | **Metric** | **Equi.** | **Gauss.** | **IGS** | **ProM (1D)** | **ProM (2D)** |
-|---------------|------------|-----------|------------|---------|---------------|---------------|
-| x8            | Dice       | 0.596     | 0.733      | 0.716   | 0.646         | 0.739         |
-| x8            | IoU        | 0.489     | 0.638      | 0.619   | 0.542         | 0.646         |
-| x16           | Dice       | 0.589     | 0.597      | 0.651   | 0.537         | 0.735         |
-| x16           | IoU        | 0.481     | 0.494      | 0.546   | 0.426         | 0.640         |
-| x32           | Dice       | 0.580     | 0.315      | 0.537   | 0.483         | 0.706         |
-| x32           | IoU        | 0.472     | 0.226      | 0.428   | 0.374         | 0.608         |

@@ -1,16 +1,17 @@
-import csv
+import glob
 import glob
 import json
 import os
 import random
-from typing import Dict, Optional
+from typing import Optional, TypedDict
 
 import nibabel
-from monai.transforms import ScaleIntensity
 import nibabel as nib
 import numpy as np
 import pandas as pd
 import torch
+from monai.transforms import ScaleIntensity
+from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize, CenterCrop, Compose
 from tqdm import tqdm
@@ -18,12 +19,39 @@ from tqdm import tqdm
 from src.utils import fft2c, ifft2c, load_h5_slice, min_max_normalize
 
 
-class ACDCDataset(Dataset):
-    def __init__(
-        self, root: str, train: bool = True, max_patients: Optional[int] = None
-    ) -> None:
+class DataBatch(TypedDict):
+    img: Tensor
+    seg: Tensor
+    k_space: Tensor
+
+
+class ProMDataset(Dataset):
+    def __init__(self, root: str, train: bool = True, *args, **kwargs) -> None:
         self.root = root
-        data_dir = 'training' if train else 'testing'
+        self.is_train = train
+
+    @property
+    def img_size(self) -> int:
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    def __getitem__(self, idx: int) -> DataBatch:
+        raise NotImplementedError
+
+
+class ACDCDataset(ProMDataset):
+    def __init__(
+        self,
+        root: str,
+        train: bool = True,
+        max_patients: Optional[int] = None,
+        *args,
+        **kwargs
+    ) -> None:
+        super().__init__(root, train)
+        data_dir = 'training' if self.is_train else 'testing'
         self.pat_dir = os.path.join(root, 'database', data_dir)
 
         pattern = os.path.join(self.pat_dir, 'patient???', 'patient???_frame01.nii.gz')
@@ -47,26 +75,25 @@ class ACDCDataset(Dataset):
             num_slices = arr.shape[-1]
 
             for i in range(2, num_slices - 2):
-                self.file_index.append({
-                    'img': arr[:, :, i],
-                    'seg': seg[:, :, i],
-                })
+                self.file_index.append(
+                    {
+                        'img': arr[:, :, i],
+                        'seg': seg[:, :, i],
+                    }
+                )
 
-        self.img_transforms = Compose([
-            ScaleIntensity(),
-            Resize(256),
-            CenterCrop(256)
-        ])
+        self.img_transforms = Compose([ScaleIntensity(), Resize(256), CenterCrop(256)])
 
-        self.seg_transforms = Compose([
-            Resize(256),
-            CenterCrop(256)
-        ])
+        self.seg_transforms = Compose([Resize(256), CenterCrop(256)])
+
+    @property
+    def img_size(self) -> int:
+        return 256
 
     def __len__(self) -> int:
         return len(self.file_index)
 
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> DataBatch:
         img = self.file_index[idx]['img']
         img = torch.tensor(img).unsqueeze(0).float()
         img = self.img_transforms(img)
@@ -80,9 +107,9 @@ class ACDCDataset(Dataset):
         return {'img': img, 'seg': seg, 'k_space': k_space}
 
 
-class KneeDataset(Dataset):
-    def __init__(self, root: str, train: bool = True) -> None:
-        self.root = root
+class KneeDataset(ProMDataset):
+    def __init__(self, root: str, train: bool = True, *args, **kwargs) -> None:
+        super().__init__(root, train)
         self.preproc_dir = os.path.join(root, 'preprocessed')
 
         self.transforms = CenterCrop(320)
@@ -91,7 +118,7 @@ class KneeDataset(Dataset):
             self._preprocess()
 
         self.file_dir = os.path.join(
-            self.root, 'preprocessed', 'train' if train else 'test'
+            self.root, 'preprocessed', 'train' if self.is_train else 'test'
         )
 
         self.files = os.listdir(self.file_dir)
@@ -129,17 +156,16 @@ class KneeDataset(Dataset):
                     annotations.append(a)
 
                 k_space = load_h5_slice(
-                    fp=os.path.join(img_dir, str(file) + '.h5'),
-                    slice_idx=int(sl)
+                    fp=os.path.join(img_dir, str(file) + '.h5'), slice_idx=int(sl)
                 )
                 img = ifft2c(k_space)
 
                 # Synthesize "segmentation" from annotations bounding boxes
                 seg = torch.zeros_like(img, dtype=torch.float)
-                counter = 1.
+                counter = 1.0
                 for x, y, width, height in annotations:
-                    seg[:, y:y + height, x:x + width] = counter
-                    counter += 1.
+                    seg[:, y : y + height, x : x + width] = counter
+                    counter += 1.0
 
                 img = self.transforms(img)
                 img = torch.abs(img)
@@ -153,32 +179,34 @@ class KneeDataset(Dataset):
                     img=img.numpy(),
                     seg=seg.numpy(),
                     k_space=k_space.numpy(),
-                    annot=np.asarray(annotations)
+                    annot=np.asarray(annotations),
                 )
+
+    @property
+    def img_size(self) -> int:
+        return 320
 
     def __len__(self) -> int:
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> DataBatch:
         f_path = os.path.join(self.file_dir, self.files[idx])
-        
+
         with np.load(f_path) as arr:
             img = torch.tensor(arr['img'])
             seg = torch.tensor(arr['seg'])
             k_space = torch.tensor(arr['k_space'])
-        #annot = torch.tensor(arr['annot'])
 
         return {
             'img': img,
             'seg': seg,
             'k_space': k_space,
-            #'annotations': annot
         }
 
 
-class BrainDataset(Dataset):
-    def __init__(self, root: str, train: bool = True) -> None:
-        self.root = root
+class BrainDataset(ProMDataset):
+    def __init__(self, root: str, train: bool = True, *args, **kwargs) -> None:
+        super().__init__(root, train)
 
         meta_file = os.path.join(self.root, 'dataset.json')
         with open(meta_file, 'r') as f:
@@ -188,7 +216,7 @@ class BrainDataset(Dataset):
             self._preprocess()
 
         self.file_dir = os.path.join(
-            self.root, 'preprocessed', 'train' if train else 'test'
+            self.root, 'preprocessed', 'train' if self.is_train else 'test'
         )
 
         self.files = os.listdir(self.file_dir)
@@ -231,10 +259,14 @@ class BrainDataset(Dataset):
                 f_path = os.path.join(target_dir, f_name)
                 np.savez_compressed(f_path, img=img_slice, seg=seg_slice)
 
+    @property
+    def img_size(self) -> int:
+        return 256
+
     def __len__(self) -> int:
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> DataBatch:
         f_path = os.path.join(self.file_dir, self.files[idx])
         arr = np.load(f_path)
 
@@ -251,3 +283,14 @@ class BrainDataset(Dataset):
         k_space = fft2c(img)
 
         return {'img': img, 'seg': seg, 'k_space': k_space}
+
+
+def get_dataset(name: str, train: bool, root: str = 'data') -> ProMDataset:
+    if name == 'acdc':
+        return ACDCDataset(os.path.join(root, 'ACDC'), train=train)
+    elif name == 'brain':
+        return BrainDataset(os.path.join(root, 'Task01_BrainTumour'), train=train)
+    elif name == 'knee':
+        return KneeDataset(os.path.join(root, 'knee_fastmri'), train=train)
+    else:
+        raise ValueError('Dataset {} unknown.'.format(name))

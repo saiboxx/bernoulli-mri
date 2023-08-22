@@ -11,12 +11,12 @@ class IGS:
     """Implements Iterative Gradients Sampling from Razumov et al"""
 
     def __init__(
-            self,
-            loss_func: Optional[nn.Module] = None,
-            device: str = 'cuda',
-            num_workers: int = 8,
-            batch_size: int = 32,
-            use_seg: bool = False,
+        self,
+        loss_func: Optional[nn.Module] = None,
+        device: str = 'cuda',
+        num_workers: int = 8,
+        batch_size: int = 32,
+        use_seg: bool = False,
     ) -> None:
         if loss_func is None:
             self.loss_func = nn.L1Loss()
@@ -37,7 +37,7 @@ class IGS:
             dataset=ds,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
         )
 
         img_size = ds[0]['img'].shape[-1]
@@ -47,7 +47,7 @@ class IGS:
             dtype=torch.float,
             device=self.device,
         )
-        w[img_size//2] = 1
+        w[img_size // 2] = 1
 
         w_list = []
 
@@ -74,8 +74,10 @@ class IGS:
             for i in torch.topk(w.grad, img_size, largest=False).indices:
                 if w[i] == 0:
                     w = w.detach()
-                    w[i] = 1.
+                    w[i] = 1.0
                     w_list.append(w.clone())
-                    pbar.set_description('select: %d, loss: %.6f' % (i.item(), loss.item()))
+                    pbar.set_description(
+                        'select: %d, loss: %.6f' % (i.item(), loss.item())
+                    )
                     break
         return w_list

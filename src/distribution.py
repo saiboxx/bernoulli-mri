@@ -34,6 +34,3 @@ class SoftBernoulliSampler:
             return y_hard - y_soft.detach() + y_soft
         else:
             return y_soft
-
-
-#%%

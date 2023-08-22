@@ -53,8 +53,11 @@ class MetricAgent:
         psnrs = psnr(prediction, target)
         self.psnrs.extend(psnrs.tolist())
 
-        kernel = gaussian_kernel(7, sigma=1.).repeat(prediction.shape[1], 1, 1).to(
-            prediction.device)
+        kernel = (
+            gaussian_kernel(7, sigma=1.0)
+            .repeat(prediction.shape[1], 1, 1)
+            .to(prediction.device)
+        )
         ssims = ssim(prediction, target, kernel)[0]
         self.ssims.extend(ssims.tolist())
 

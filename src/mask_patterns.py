@@ -1,4 +1,3 @@
-
 """
 This code was adapted from https://github.com/facebookresearch/fastMRI/
 Copyright (c) Facebook, Inc. and its affiliates.
@@ -196,6 +195,7 @@ class MaskFunc:
             choice = self.rng.randint(len(self.center_fractions))
             return self.center_fractions[choice], self.accelerations[choice]
 
+
 class EquiSpacedMaskFunc(MaskFunc):
     """
     Sample data with equally-spaced k-space lines.
@@ -306,7 +306,9 @@ def create_mask_for_mask_type(
         raise ValueError(f"{mask_type_str} not supported")
 
 
-def get_2d_variable_density_mask(img_size: int, acc_fac: int, scale: int = 35) -> Tensor:
+def get_2d_variable_density_mask(
+    img_size: int, acc_fac: int, scale: int = 35
+) -> Tensor:
     n = img_size**2 // acc_fac
     mask = torch.zeros(img_size, img_size)
 

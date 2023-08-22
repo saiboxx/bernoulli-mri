@@ -1,15 +1,20 @@
 import os
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import h5py
 import matplotlib.pyplot as plt
 from monai.networks import one_hot
+from monai.metrics import DiceMetric, MeanIoU
 import numpy as np
 import torch
+from monai.networks.nets import UNet
 from torch import Tensor
 from torch.fft import ifftshift, fftshift, ifft2, fft2
+from torch.utils.data import DataLoader
 from torchvision.utils import save_image
+from tqdm import tqdm
 
+from src.evaluation import MetricAgent
 
 
 def ifft2c(data: Tensor, norm: str = 'forward') -> Tensor:
@@ -128,7 +133,7 @@ class MaskLogger:
         content = {
             'scores': self.probs,
             'steps': self.steps,
-            'dense_rates': self.dense_rates
+            'dense_rates': self.dense_rates,
         }
         torch.save(obj=content, f=os.path.join(self.log_dir, f_name))
 
@@ -157,3 +162,80 @@ def get_top_k_mask(scores: Tensor, acc_fac: int) -> Tensor:
     mask = torch.zeros_like(scores)
     mask[idxs[:, 0], idxs[:, 1]] = 1
     return mask
+
+
+def get_reconstruction_metrics(
+    dl: DataLoader, mask: Tensor, device: Union[str, int, torch.device]
+) -> Tuple[float, float, float]:
+    metric_agent = MetricAgent()
+
+    for batch in tqdm(dl, leave=False):
+        img_k = batch['k_space'].to(device)
+        img = batch['img'].to(device)
+
+        img_pred = ifft2c(img_k * mask + 0.0)
+        img_mag = torch.abs(img_pred)
+
+        metric_agent(img_mag, img)
+
+    m = metric_agent.aggregate()
+
+    return m['PSNR'], m['SSIM'], m['NMSE']
+
+
+def get_segmentation_metrics(
+    dl: DataLoader,
+    model: UNet,
+    device: Union[str, int, torch.device],
+    mask: Optional[Tensor] = None,
+) -> Tuple[float, float]:
+    dice_metric = DiceMetric(include_background=False)
+    iou_metric = MeanIoU(include_background=False)
+
+    for batch in tqdm(dl, leave=False):
+
+        if mask is not None:
+            img = batch['k_space'].to(device)
+            img = ifft2c(img * mask + 0.0)
+            img = torch.abs(img)
+        else:
+            img = batch['img'].to(device)
+
+        seg = batch['seg'].to(device)
+        pred = model(img)
+
+        pred = one_hot(torch.argmax(pred, dim=1).unsqueeze(1), num_classes=4)
+        seg = one_hot(seg, num_classes=4)
+
+        dice_metric(y_pred=pred, y=seg)
+        iou_metric(y_pred=pred, y=seg)
+
+    dice_res = dice_metric.aggregate()
+    iou_res = iou_metric.aggregate()
+
+    return float(dice_res.mean(dim=0).cpu()), float(iou_res.mean(dim=0).cpu())
+
+
+def get_unet(dataset_name: str) -> UNet:
+
+    if dataset_name == 'acdc':
+        in_channels = 1
+        model_path = 'models/acdc_unet.pt'
+    elif dataset_name == 'brain':
+        in_channels = 4
+        model_path = 'models/brain_unet.pt'
+    else:
+        raise ValueError('Dataset name {} is unknown.'.format(dataset_name))
+
+    model = UNet(
+        spatial_dims=2,
+        in_channels=in_channels,
+        out_channels=4,
+        channels=(16, 32, 64, 128, 256),
+        strides=(2, 2, 2, 2),
+        num_res_units=2,
+    )
+
+    sd = torch.load(model_path)
+    model.load_state_dict(sd['model'])
+    return model
